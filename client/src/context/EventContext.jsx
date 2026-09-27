@@ -5,15 +5,21 @@ const EventContext = createContext(null);
 
 const tabToPath = {
   discovery: '/',
-  organizer: '/dashboard/organizer',
-  participant: '/dashboard/participant',
-  volunteer: '/dashboard/volunteer',
+  organizer: '/organizer',
+  participant: '/participant',
+  volunteer: '/volunteer-scanner',
 };
 
 const pathToTab = {
   '/': 'discovery',
+  '/events': 'discovery',
+  '/organizer': 'organizer',
   '/dashboard/organizer': 'organizer',
+  '/participant': 'participant',
   '/dashboard/participant': 'participant',
+  '/my-passes': 'participant',
+  '/volunteer': 'volunteer',
+  '/volunteer-scanner': 'volunteer',
   '/dashboard/volunteer': 'volunteer',
 };
 

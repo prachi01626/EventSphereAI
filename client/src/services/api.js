@@ -1,7 +1,13 @@
 import axios from 'axios';
 
+// Connect directly to backend at http://localhost:5000/api or configured environment
+export const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL ||
+  import.meta.env.VITE_API_URL ||
+  'http://localhost:5000/api';
+
 const API = axios.create({
-  baseURL: '/api',
+  baseURL: API_BASE_URL,
 });
 
 // Request interceptor to attach JWT token

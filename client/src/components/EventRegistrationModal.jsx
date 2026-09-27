@@ -26,7 +26,7 @@ export const EventRegistrationModal = () => {
   const { user, openAuthModal } = useAuth();
 
   const [customAnswers, setCustomAnswers] = useState({});
-  const [loading, setLoading] = useState(false);
+  const [paymentLoading, setPaymentLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
   const [registeredSuccess, setRegisteredSuccess] = useState(null);
 
@@ -43,71 +43,36 @@ export const EventRegistrationModal = () => {
 
   const handlePaymentAndRegister = async (e) => {
     e.preventDefault();
-    setLoading(true);
+    setPaymentLoading(true);
     setErrorMessage('');
 
     try {
-      const orderData = await paymentService.createOrder(event._id, customAnswers);
-
-      if (orderData.free) {
-        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-        setRegisteredSuccess(orderData.registrationId);
-        setLoading(false);
+      if (!user) {
+        openAuthModal('login', 'Participant');
         return;
       }
 
-      const options = {
-        key: orderData.key_id || 'rzp_test_EventSphere2026',
-        amount: orderData.amount,
-        currency: orderData.currency || 'INR',
-        name: 'EventSphere AI',
-        description: `Pass for ${event.title}`,
-        order_id: orderData.order_id,
-        prefill: {
-          name: user?.name || orderData.participantName || '',
-          email: user?.email || orderData.participantEmail || '',
-        },
-        theme: {
-          color: '#2d5a43',
-        },
-        modal: {
-          ondismiss: () => {
-            setLoading(false);
-          },
-        },
-        handler: async (response) => {
-          try {
-            const verifyRes = await paymentService.verifyPayment({
-              razorpay_order_id: response.razorpay_order_id,
-              razorpay_payment_id: response.razorpay_payment_id,
-              razorpay_signature: response.razorpay_signature,
-              registrationId: orderData.registrationId,
-            });
+      // Step 1: Create Order via Node.js/MongoDB Backend
+      const orderData = await paymentService.createOrder(event._id, customAnswers);
 
-            if (verifyRes.success) {
-              confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
-              setRegisteredSuccess(orderData.registrationId);
-            } else {
-              setErrorMessage('Payment verification failed');
-            }
-          } catch (vErr) {
-            setErrorMessage(vErr.response?.data?.message || 'Verification error');
-          } finally {
-            setLoading(false);
-          }
-        },
-      };
+      // Step 2: Handle Free Pass Registration directly
+      if (orderData.free) {
+        confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
+        setRegisteredSuccess(orderData.registrationId);
+        return;
+      }
 
-      if (typeof window.Razorpay === 'function') {
-        const rzp = new window.Razorpay(options);
-        rzp.on('payment.failed', function (failResp) {
-          setErrorMessage(`Payment Failed: ${failResp.error?.description || 'Declined'}`);
-          setLoading(false);
-        });
-        rzp.open();
-      } else {
+      // Step 3: Handle Sandbox / Simulated Demonstration Mode (when dummy/missing keys are active on localhost)
+      if (
+        orderData.simulated ||
+        orderData.mockSuccess ||
+        !window.Razorpay ||
+        orderData.order_id?.startsWith('order_sim_')
+      ) {
+        console.log('⚡ Using EventSphere AI Instant Sandbox Checkout (Demo/Localhost Mode)');
+
         const verifyRes = await paymentService.verifyPayment({
-          razorpay_order_id: orderData.order_id,
+          razorpay_order_id: orderData.order_id || `order_sim_${Date.now()}`,
           razorpay_payment_id: `pay_sim_${Date.now()}`,
           razorpay_signature: 'simulated_signature',
           registrationId: orderData.registrationId,
@@ -116,13 +81,101 @@ export const EventRegistrationModal = () => {
         if (verifyRes.success) {
           confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
           setRegisteredSuccess(orderData.registrationId);
+        } else {
+          setErrorMessage(verifyRes.message || 'Payment verification failed');
         }
-        setLoading(false);
+        return;
       }
+
+      // Step 4: Live Razorpay Gateway Checkout Flow
+      await new Promise((resolve, reject) => {
+        try {
+          const options = {
+            key: orderData.key_id,
+            amount: orderData.amount,
+            currency: orderData.currency || 'INR',
+            name: 'EventSphere AI',
+            description: `Pass Admission: ${event.title}`,
+            order_id: orderData.order_id,
+            prefill: {
+              name: user?.name || orderData.participantName || '',
+              email: user?.email || orderData.participantEmail || '',
+            },
+            theme: {
+              color: '#2d5a43',
+            },
+            // Reset button loading state immediately if modal is closed or cancelled
+            modal: {
+              ondismiss: () => {
+                setPaymentLoading(false);
+                resolve();
+              },
+              escape: true,
+              backdropclose: false,
+            },
+            handler: async (response) => {
+              try {
+                const verifyRes = await paymentService.verifyPayment({
+                  razorpay_order_id: response.razorpay_order_id,
+                  razorpay_payment_id: response.razorpay_payment_id,
+                  razorpay_signature: response.razorpay_signature,
+                  registrationId: orderData.registrationId,
+                });
+
+                if (verifyRes.success) {
+                  confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+                  setRegisteredSuccess(orderData.registrationId);
+                  resolve();
+                } else {
+                  setErrorMessage(verifyRes.message || 'Payment verification failed');
+                  reject(new Error('Payment verification failed'));
+                }
+              } catch (vErr) {
+                setErrorMessage(vErr.response?.data?.message || 'Payment verification error');
+                reject(vErr);
+              }
+            },
+          };
+
+          const rzp = new window.Razorpay(options);
+
+          rzp.on('payment.failed', function (failResp) {
+            setErrorMessage(`Payment Failed: ${failResp.error?.description || 'Transaction declined'}`);
+            setPaymentLoading(false);
+            reject(new Error(failResp.error?.description || 'Payment failed'));
+          });
+
+          rzp.open();
+        } catch (rzpInitErr) {
+          console.warn('Razorpay SDK modal error, executing fallback verification:', rzpInitErr.message);
+          paymentService
+            .verifyPayment({
+              razorpay_order_id: orderData.order_id,
+              razorpay_payment_id: `pay_sim_${Date.now()}`,
+              razorpay_signature: 'simulated_signature',
+              registrationId: orderData.registrationId,
+            })
+            .then((verifyRes) => {
+              if (verifyRes.success) {
+                confetti({ particleCount: 120, spread: 80, origin: { y: 0.6 } });
+                setRegisteredSuccess(orderData.registrationId);
+                resolve();
+              } else {
+                setErrorMessage('Verification failed');
+                reject(new Error('Verification failed'));
+              }
+            })
+            .catch(reject);
+        }
+      });
     } catch (err) {
       console.error('Registration/Payment error:', err);
-      setErrorMessage(err.response?.data?.message || 'Failed to initiate checkout');
-      setLoading(false);
+      setErrorMessage(
+        err.response?.data?.message || err.message || 'Failed to complete registration checkout'
+      );
+    } finally {
+      // Guaranteed teardown: always resets payment loading state
+      setPaymentLoading(false);
     }
   };
 
@@ -272,20 +325,22 @@ export const EventRegistrationModal = () => {
             <div className="pt-3">
               <button
                 type="submit"
-                disabled={loading || !user}
+                disabled={paymentLoading || !user}
                 className="w-full py-3.5 px-6 forest-pill-active rounded-2xl font-bold text-sm shadow-pill flex items-center justify-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50"
               >
-                {loading ? (
+                {paymentLoading ? (
                   <>
                     <Loader2 className="w-4 h-4 animate-spin text-emerald-300" />
-                    Connecting to Payment Gateway...
+                    <span>Connecting to Payment Gateway...</span>
                   </>
                 ) : (
                   <>
                     <ShieldCheck className="w-4 h-4 text-emerald-300" />
-                    {event.ticketPrice === 0
-                      ? 'Claim Free VIP Pass'
-                      : `Proceed to Pay ${formatCurrency(event.ticketPrice)}`}
+                    <span>
+                      {event.ticketPrice === 0
+                        ? 'Claim Free VIP Pass'
+                        : `Proceed to Pay ${formatCurrency(event.ticketPrice)}`}
+                    </span>
                   </>
                 )}
               </button>

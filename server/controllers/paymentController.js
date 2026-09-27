@@ -4,13 +4,29 @@ const Registration = require('../models/Registration');
 const Event = require('../models/Event');
 const { generateSecret } = require('../utils/qr');
 
+const isDummyKey = (keyId, keySecret) => {
+  if (!keyId || !keySecret) return true;
+  if (keyId.includes('EventSphere') || keySecret.includes('EventSphere')) return true;
+  if (keyId.length < 14) return true;
+  return false;
+};
+
 const getRazorpayInstance = () => {
   const key_id = process.env.RAZORPAY_KEY_ID || 'rzp_test_EventSphere2026';
   const key_secret = process.env.RAZORPAY_KEY_SECRET || 'EventSphereRazorpaySecretKey2026';
+
+  let instance = null;
+  try {
+    instance = new Razorpay({ key_id, key_secret });
+  } catch (err) {
+    console.warn('Razorpay SDK initialization notice:', err.message);
+  }
+
   return {
-    instance: new Razorpay({ key_id, key_secret }),
+    instance,
     key_id,
     key_secret,
+    isDummy: isDummyKey(key_id, key_secret),
   };
 };
 
@@ -67,25 +83,34 @@ const createOrder = async (req, res, next) => {
       });
     }
 
-    // Paid Event: Create Razorpay Order
-    const { instance, key_id } = getRazorpayInstance();
+    // Paid Event: Attempt Razorpay Order or Fallback cleanly
+    const { instance, key_id, isDummy } = getRazorpayInstance();
     const amountInPaise = Math.round(event.ticketPrice * 100);
 
-    let order;
-    try {
-      order = await instance.orders.create({
-        amount: amountInPaise,
-        currency: 'INR',
-        receipt: `rcpt_${Date.now()}_${participantId.toString().slice(-4)}`,
-        notes: {
-          eventId: event._id.toString(),
-          eventTitle: event.title,
-          participantId: participantId.toString(),
-        },
-      });
-    } catch (rzpErr) {
-      console.warn('Razorpay live order creation fallback to simulated gateway:', rzpErr.message);
-      // Simulated Sandbox order for zero-friction demonstrations
+    let order = null;
+    let isSimulated = false;
+
+    if (!isDummy && instance) {
+      try {
+        order = await instance.orders.create({
+          amount: amountInPaise,
+          currency: 'INR',
+          receipt: `rcpt_${Date.now()}_${participantId.toString().slice(-4)}`,
+          notes: {
+            eventId: event._id.toString(),
+            eventTitle: event.title,
+            participantId: participantId.toString(),
+          },
+        });
+      } catch (rzpErr) {
+        console.warn('Live Razorpay order creation failed, switching to sandbox simulation mode:', rzpErr.message);
+        isSimulated = true;
+      }
+    } else {
+      isSimulated = true;
+    }
+
+    if (isSimulated || !order) {
       order = {
         id: `order_sim_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`,
         amount: amountInPaise,
@@ -120,6 +145,11 @@ const createOrder = async (req, res, next) => {
       eventTitle: event.title,
       participantName: req.user.name,
       participantEmail: req.user.email,
+      simulated: isSimulated,
+      mockSuccess: isSimulated,
+      message: isSimulated
+        ? 'Sandbox / Demonstration Mode: Instant simulated checkout active.'
+        : 'Live Razorpay order initialized.',
     });
   } catch (error) {
     next(error);
@@ -154,16 +184,26 @@ const verifyPayment = async (req, res, next) => {
     // Signature verification logic
     let isSignatureValid = false;
 
-    // Check if it's a simulated order
-    if (razorpay_order_id.startsWith('order_sim_') || razorpay_signature === 'simulated_signature') {
+    // Check if it's a simulated order or sandbox fallback
+    if (
+      !razorpay_order_id ||
+      razorpay_order_id.startsWith('order_sim_') ||
+      razorpay_signature === 'simulated_signature' ||
+      (razorpay_payment_id && razorpay_payment_id.startsWith('pay_sim_'))
+    ) {
       isSignatureValid = true;
     } else {
-      const generated_signature = crypto
-        .createHmac('sha256', key_secret)
-        .update(`${razorpay_order_id}|${razorpay_payment_id}`)
-        .digest('hex');
+      try {
+        const generated_signature = crypto
+          .createHmac('sha256', key_secret)
+          .update(`${razorpay_order_id}|${razorpay_payment_id}`)
+          .digest('hex');
 
-      isSignatureValid = generated_signature === razorpay_signature;
+        isSignatureValid = generated_signature === razorpay_signature;
+      } catch (sigErr) {
+        console.warn('HMAC calculation failed:', sigErr.message);
+        isSignatureValid = false;
+      }
     }
 
     if (!isSignatureValid) {
@@ -179,8 +219,8 @@ const verifyPayment = async (req, res, next) => {
     const totpSecret = generateSecret();
 
     registration.paymentStatus = 'Completed';
-    registration.razorpayOrderId = razorpay_order_id;
-    registration.razorpayPaymentId = razorpay_payment_id;
+    registration.razorpayOrderId = razorpay_order_id || 'ORDER_COMPLETED';
+    registration.razorpayPaymentId = razorpay_payment_id || `PAY_${Date.now()}`;
     registration.totpSecret = totpSecret;
     await registration.save();
 

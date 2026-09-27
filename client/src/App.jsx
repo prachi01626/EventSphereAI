@@ -1,11 +1,12 @@
 import React from 'react';
-import { AuthProvider } from './context/AuthContext';
+import { AuthProvider, useAuth } from './context/AuthContext';
 import { EventProvider, useEvents } from './context/EventContext';
 import { Navbar } from './components/Navbar';
 import { DiscoveryLanding } from './pages/DiscoveryLanding';
 import { OrganizerDashboard } from './pages/OrganizerDashboard';
 import { ParticipantPortal } from './pages/ParticipantPortal';
 import { VolunteerScanner } from './pages/VolunteerScanner';
+import { AccessDenied } from './components/AccessDenied';
 
 // Modals
 import { AuthModal } from './components/AuthModal';
@@ -19,18 +20,51 @@ import { Shield } from 'lucide-react';
 
 const MainLayout = () => {
   const { activeTab } = useEvents();
+  const { user, isAuthenticated } = useAuth();
+
+  // Strict Protected Route Evaluation (RBAC)
+  const renderPortal = () => {
+    // 1. Public Discovery Landing (Home / Events)
+    if (activeTab === 'discovery') {
+      return <DiscoveryLanding />;
+    }
+
+    // 2. Organizer Hub: Strictly Organizer role only
+    if (activeTab === 'organizer') {
+      if (!isAuthenticated || user?.role !== 'Organizer') {
+        return <AccessDenied targetResource="Organizer Hub" requiredRole="Organizer" />;
+      }
+      return <OrganizerDashboard />;
+    }
+
+    // 3. Volunteer Scanner: Strictly Volunteer or Organizer role only
+    // If a Participant navigates to /volunteer-scanner, render 403 Access Denied
+    if (activeTab === 'volunteer') {
+      if (!isAuthenticated || (user?.role !== 'Volunteer' && user?.role !== 'Organizer')) {
+        return <AccessDenied targetResource="Volunteer Gate Scanner" requiredRole="Volunteer" />;
+      }
+      return <VolunteerScanner />;
+    }
+
+    // 4. Participant Portal (My Passes): Authenticated attendees
+    if (activeTab === 'participant') {
+      if (!isAuthenticated) {
+        return <AccessDenied targetResource="Attendee Pass Vault" requiredRole="Participant" />;
+      }
+      return <ParticipantPortal />;
+    }
+
+    return <DiscoveryLanding />;
+  };
 
   return (
     <div className="min-h-screen flex flex-col font-sans selection:bg-emerald-700 selection:text-white">
       {/* 1. Glassmorphism Navigation Bar */}
       <Navbar />
 
-      {/* 2. Main Dynamic Content Portals (Default: DiscoveryLanding) */}
+      {/* 2. Main Dynamic Content Portals with Strict RBAC Route Protection */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-6">
-        {activeTab === 'discovery' && <DiscoveryLanding />}
-        {activeTab === 'organizer' && <OrganizerDashboard />}
-        {activeTab === 'participant' && <ParticipantPortal />}
-        {activeTab === 'volunteer' && <VolunteerScanner />}
+        {renderPortal()}
       </main>
 
       {/* 3. Global Interactive Modals */}

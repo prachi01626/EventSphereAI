@@ -10,37 +10,49 @@ import {
   LogOut,
   User,
   LogIn,
-  Sparkles,
 } from 'lucide-react';
 
 export const Navbar = () => {
   const { user, isAuthenticated, logout, openAuthModal } = useAuth();
   const { activeTab, setActiveTab } = useEvents();
 
-  const handleNavClick = (itemId) => {
-    if (itemId === 'discovery') {
-      setActiveTab('discovery');
-      return;
+  // Strict Dynamic Nav Tabs according to user.role from AuthContext
+  const getNavItems = () => {
+    const homeTab = { id: 'discovery', label: 'Home / Events', icon: Compass };
+    const organizerTab = { id: 'organizer', label: 'Organizer Hub', icon: LayoutDashboard };
+    const participantTab = { id: 'participant', label: 'My Passes', icon: Ticket };
+    const volunteerTab = { id: 'volunteer', label: 'Volunteer Scanner', icon: ScanLine };
+
+    // 1. Unauthenticated Guest: ONLY Home / Events
+    if (!isAuthenticated || !user) {
+      return [homeTab];
     }
 
-    // Require authentication for role-based dashboards
-    if (!isAuthenticated) {
-      if (itemId === 'organizer') openAuthModal('login', 'Organizer');
-      else if (itemId === 'participant') openAuthModal('login', 'Participant');
-      else if (itemId === 'volunteer') openAuthModal('login', 'Volunteer');
-      else openAuthModal('login');
-      return;
+    // 2. Participant: ONLY "Home / Events", "My Passes", and Profile/Logout.
+    // HIDE completely: "Organizer Hub" and "Volunteer Scanner".
+    if (user.role === 'Participant') {
+      return [homeTab, participantTab];
     }
 
-    setActiveTab(itemId);
+    // 3. Volunteer: ONLY "Home / Events", "Volunteer Scanner", and Profile/Logout.
+    // HIDE completely: "Organizer Hub".
+    if (user.role === 'Volunteer') {
+      return [homeTab, volunteerTab];
+    }
+
+    // 4. Organizer: ALL tabs
+    if (user.role === 'Organizer') {
+      return [homeTab, organizerTab, participantTab, volunteerTab];
+    }
+
+    return [homeTab];
   };
 
-  const navItems = [
-    { id: 'discovery', label: 'Discovery', icon: Compass, public: true },
-    { id: 'organizer', label: 'Organizer Hub', icon: LayoutDashboard, role: 'Organizer' },
-    { id: 'participant', label: 'Digital Passes', icon: Ticket, role: 'Participant' },
-    { id: 'volunteer', label: 'Volunteer Scanner', icon: ScanLine, role: 'Volunteer' },
-  ];
+  const navItems = getNavItems();
+
+  const handleNavClick = (itemId) => {
+    setActiveTab(itemId);
+  };
 
   return (
     <header className="glass-panel border-b border-white/60 sticky top-0 z-40 shadow-glass">
@@ -71,12 +83,11 @@ export const Navbar = () => {
             </div>
           </div>
 
-          {/* Center Navigation Portal Tabs */}
+          {/* Center Navigation Portal Tabs (Dynamically rendered based on user.role) */}
           <nav className="hidden md:flex items-center gap-1.5 bg-white/70 p-1.5 rounded-2xl border border-white/90 shadow-sm">
             {navItems.map((item) => {
               const Icon = item.icon;
               const isActive = activeTab === item.id;
-              const isUserRole = user?.role === item.role;
 
               return (
                 <button
@@ -90,9 +101,6 @@ export const Navbar = () => {
                 >
                   <Icon className="w-4 h-4" />
                   <span>{item.label}</span>
-                  {isAuthenticated && isUserRole && (
-                    <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 absolute top-1.5 right-1.5"></span>
-                  )}
                 </button>
               );
             })}

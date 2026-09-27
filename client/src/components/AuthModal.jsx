@@ -311,45 +311,6 @@ export const AuthModal = () => {
             </button>
           </div>
         </form>
-
-        {/* Quick Test Accounts for instant evaluation */}
-        {mode === 'login' && (
-          <div className="mt-6 pt-4 border-t border-slate-200 space-y-2">
-            <div className="flex items-center justify-between text-[11px] text-slate-500">
-              <span className="font-semibold flex items-center gap-1">
-                <Sparkles className="w-3 h-3 text-emerald-600" />
-                Quick Test Credentials (Pre-seeded):
-              </span>
-              <span>PW: password123</span>
-            </div>
-            <div className="grid grid-cols-3 gap-1.5 text-[11px]">
-              <button
-                type="button"
-                onClick={() => fillQuickAccount('organizer@eventsphere.ai', 'password123', 'Organizer')}
-                className="py-1.5 px-2 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-900 border border-slate-200 rounded-xl font-medium text-slate-700 transition-colors truncate"
-                title="Login as Organizer"
-              >
-                Organizer
-              </button>
-              <button
-                type="button"
-                onClick={() => fillQuickAccount('participant@eventsphere.ai', 'password123', 'Participant')}
-                className="py-1.5 px-2 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-900 border border-slate-200 rounded-xl font-medium text-slate-700 transition-colors truncate"
-                title="Login as Participant"
-              >
-                Participant
-              </button>
-              <button
-                type="button"
-                onClick={() => fillQuickAccount('volunteer@eventsphere.ai', 'password123', 'Volunteer')}
-                className="py-1.5 px-2 bg-slate-100 hover:bg-emerald-50 hover:text-emerald-900 border border-slate-200 rounded-xl font-medium text-slate-700 transition-colors truncate"
-                title="Login as Volunteer"
-              >
-                Volunteer
-              </button>
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );

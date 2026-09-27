@@ -26,7 +26,14 @@ const { generateSecret } = require('./utils/qr');
 const app = express();
 
 // Middlewares
-app.use(cors());
+app.use(
+  cors({
+    origin: true, // Dynamically allow requests from frontend (localhost:3000, 127.0.0.1, etc.)
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
+  })
+);
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -41,6 +48,7 @@ app.get('/api/health', (req, res) => {
 
 // Mount Routes
 app.use('/api/auth', authRoutes);
+app.use('/api/users', authRoutes); // Route alias for /api/users and /api/users/me
 app.use('/api/events', eventRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/pass', passRoutes);
@@ -214,7 +222,7 @@ const PORT = process.env.PORT || 5000;
 const startServer = async () => {
   await connectDB();
   await seedInitialData();
-  app.listen(PORT, () => {
+  app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 EventSphere AI Server running on http://localhost:${PORT}`);
   });
 };

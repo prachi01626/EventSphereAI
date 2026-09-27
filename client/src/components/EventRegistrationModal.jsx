@@ -23,7 +23,7 @@ export const EventRegistrationModal = () => {
     setActiveTab,
   } = useEvents();
 
-  const { user } = useAuth();
+  const { user, openAuthModal } = useAuth();
 
   const [customAnswers, setCustomAnswers] = useState({});
   const [loading, setLoading] = useState(false);
@@ -194,14 +194,33 @@ export const EventRegistrationModal = () => {
               </div>
             </div>
 
-            <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs text-slate-700 space-y-1">
-              <p>
-                <strong className="text-slate-900">Attendee:</strong> {user?.name || 'Guest User'}
-              </p>
-              <p>
-                <strong className="text-slate-900">Email:</strong> {user?.email || 'guest@eventsphere.ai'}
-              </p>
-            </div>
+            {!user ? (
+              <div className="bg-amber-50 p-4 rounded-2xl border border-amber-200 text-xs text-amber-900 space-y-2.5">
+                <div className="flex items-center gap-2 font-bold">
+                  <AlertCircle className="w-4 h-4 text-amber-700" />
+                  <span>Attendee Sign-In Required</span>
+                </div>
+                <p className="text-slate-600">
+                  Please sign in or create an account to register and link this 30s Dynamic Pass to your identity.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => openAuthModal('login', 'Participant')}
+                  className="w-full py-2.5 px-4 forest-pill-active rounded-xl font-bold text-xs shadow-xs"
+                >
+                  Sign In / Register to Continue →
+                </button>
+              </div>
+            ) : (
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-200 text-xs text-slate-700 space-y-1">
+                <p>
+                  <strong className="text-slate-900">Attendee:</strong> {user.name}
+                </p>
+                <p>
+                  <strong className="text-slate-900">Email:</strong> {user.email}
+                </p>
+              </div>
+            )}
 
             {event.customFormFields && event.customFormFields.length > 0 && (
               <div className="space-y-3 pt-2">
@@ -253,7 +272,7 @@ export const EventRegistrationModal = () => {
             <div className="pt-3">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={loading || !user}
                 className="w-full py-3.5 px-6 forest-pill-active rounded-2xl font-bold text-sm shadow-pill flex items-center justify-center gap-2 transition-all hover:scale-[1.02] disabled:opacity-50"
               >
                 {loading ? (

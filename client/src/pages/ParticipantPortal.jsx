@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 
 export const ParticipantPortal = () => {
-  const { user } = useAuth();
+  const { user, isAuthenticated, openAuthModal } = useAuth();
   const { setActiveTab, openFeedbackModal } = useEvents();
 
   const [passes, setPasses] = useState([]);
@@ -23,6 +23,11 @@ export const ParticipantPortal = () => {
   const [loading, setLoading] = useState(true);
 
   const fetchPasses = async () => {
+    if (!localStorage.getItem('eventsphere_token')) {
+      setPasses([]);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     try {
       const data = await passService.getMyPasses();
@@ -66,7 +71,23 @@ export const ParticipantPortal = () => {
         </button>
       </div>
 
-      {loading ? (
+      {!isAuthenticated ? (
+        <div className="glass-card py-16 px-6 rounded-3xl border border-white/80 text-center max-w-lg mx-auto space-y-4 shadow-glass">
+          <div className="w-16 h-16 rounded-full bg-emerald-50 border border-emerald-200 flex items-center justify-center mx-auto text-emerald-600">
+            <Ticket className="w-8 h-8" />
+          </div>
+          <h3 className="text-xl font-bold text-slate-900">Sign In to View Passes</h3>
+          <p className="text-xs text-slate-600 leading-relaxed">
+            Your 30-Second TOTP Dynamic Passes are securely tied to your registered attendee profile. Sign in or create an account to access your pass vault.
+          </p>
+          <button
+            onClick={() => openAuthModal('login', 'Participant')}
+            className="px-6 py-3 forest-pill-active rounded-2xl text-xs font-bold shadow-pill"
+          >
+            Sign In / Register as Attendee →
+          </button>
+        </div>
+      ) : loading ? (
         <div className="py-24 text-center space-y-3">
           <RefreshCw className="w-8 h-8 text-emerald-700 animate-spin mx-auto" />
           <p className="text-xs text-slate-600 font-semibold">Decrypting your Dynamic Passes...</p>

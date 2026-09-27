@@ -1,7 +1,6 @@
 import React from 'react';
-import { AuthProvider, useAuth } from './context/AuthContext';
+import { AuthProvider } from './context/AuthContext';
 import { EventProvider, useEvents } from './context/EventContext';
-import { DemoRoleBar } from './components/DemoRoleBar';
 import { Navbar } from './components/Navbar';
 import { DiscoveryLanding } from './pages/DiscoveryLanding';
 import { OrganizerDashboard } from './pages/OrganizerDashboard';
@@ -9,6 +8,7 @@ import { ParticipantPortal } from './pages/ParticipantPortal';
 import { VolunteerScanner } from './pages/VolunteerScanner';
 
 // Modals
+import { AuthModal } from './components/AuthModal';
 import { EventCopilotModal } from './components/EventCopilotModal';
 import { VolunteerAllocationModal } from './components/VolunteerAllocationModal';
 import { EventRegistrationModal } from './components/EventRegistrationModal';
@@ -22,13 +22,10 @@ const MainLayout = () => {
 
   return (
     <div className="min-h-screen flex flex-col font-sans selection:bg-emerald-700 selection:text-white">
-      {/* 1. Presentation Demo Role Switcher Bar */}
-      <DemoRoleBar />
-
-      {/* 2. Glassmorphism Navigation Bar */}
+      {/* 1. Glassmorphism Navigation Bar */}
       <Navbar />
 
-      {/* 3. Main Dynamic Content Portals */}
+      {/* 2. Main Dynamic Content Portals (Default: DiscoveryLanding) */}
       <main className="flex-1 max-w-7xl mx-auto w-full px-4 sm:px-6 lg:px-8 pt-6">
         {activeTab === 'discovery' && <DiscoveryLanding />}
         {activeTab === 'organizer' && <OrganizerDashboard />}
@@ -36,14 +33,15 @@ const MainLayout = () => {
         {activeTab === 'volunteer' && <VolunteerScanner />}
       </main>
 
-      {/* 4. Global Interactive Modals */}
+      {/* 3. Global Interactive Modals */}
+      <AuthModal />
       <EventCopilotModal />
       <VolunteerAllocationModal />
       <EventRegistrationModal />
       <SentimentReportModal />
       <FeedbackModal />
 
-      {/* 5. Sage Frosted Footer */}
+      {/* 4. Sage Frosted Footer */}
       <footer className="border-t border-white/60 bg-white/70 backdrop-blur-md py-8 px-4 text-xs text-slate-600 mt-auto shadow-glass">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">

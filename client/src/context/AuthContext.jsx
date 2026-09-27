@@ -8,7 +8,12 @@ export const AuthProvider = ({ children }) => {
   const [token, setToken] = useState(localStorage.getItem('eventsphere_token') || null);
   const [loading, setLoading] = useState(true);
 
-  // Initialize and fetch profile if token exists
+  // Global Auth Modal state
+  const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [authModalMode, setAuthModalMode] = useState('login'); // 'login' | 'register'
+  const [authModalInitialRole, setAuthModalInitialRole] = useState('Participant');
+
+  // Initialize and verify profile if stored token exists
   useEffect(() => {
     const initAuth = async () => {
       const storedToken = localStorage.getItem('eventsphere_token');
@@ -16,15 +21,16 @@ export const AuthProvider = ({ children }) => {
         try {
           const profile = await authService.getMe();
           setUser(profile);
+          setToken(storedToken);
         } catch (err) {
-          console.warn('Session expired, clearing token');
+          console.warn('Stored token is invalid or expired, resetting session');
           localStorage.removeItem('eventsphere_token');
           setToken(null);
           setUser(null);
         }
       } else {
-        // By default, auto-login as Participant for instant interactive demo
-        await switchDemoRole('Participant');
+        setUser(null);
+        setToken(null);
       }
       setLoading(false);
     };
@@ -32,6 +38,17 @@ export const AuthProvider = ({ children }) => {
     initAuth();
   }, []);
 
+  const openAuthModal = (mode = 'login', initialRole = 'Participant') => {
+    setAuthModalMode(mode);
+    setAuthModalInitialRole(initialRole);
+    setIsAuthModalOpen(true);
+  };
+
+  const closeAuthModal = () => {
+    setIsAuthModalOpen(false);
+  };
+
+  // Real backend login against /api/auth/login
   const login = async (email, password) => {
     setLoading(true);
     try {
@@ -39,17 +56,20 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('eventsphere_token', data.token);
       setToken(data.token);
       setUser(data);
+      setIsAuthModalOpen(false);
       return { success: true, user: data };
     } catch (err) {
+      const message = err.response?.data?.message || err.message || 'Login failed';
       return {
         success: false,
-        message: err.response?.data?.message || 'Login failed',
+        message,
       };
     } finally {
       setLoading(false);
     }
   };
 
+  // Real backend registration against /api/auth/register
   const register = async (userData) => {
     setLoading(true);
     try {
@@ -57,11 +77,13 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('eventsphere_token', data.token);
       setToken(data.token);
       setUser(data);
+      setIsAuthModalOpen(false);
       return { success: true, user: data };
     } catch (err) {
+      const message = err.response?.data?.message || err.message || 'Registration failed';
       return {
         success: false,
-        message: err.response?.data?.message || 'Registration failed',
+        message,
       };
     } finally {
       setLoading(false);
@@ -74,38 +96,6 @@ export const AuthProvider = ({ children }) => {
     setUser(null);
   };
 
-  // Demo Role Switcher helper
-  const switchDemoRole = async (targetRole) => {
-    setLoading(true);
-    try {
-      let email = 'participant@eventsphere.ai';
-      if (targetRole === 'Organizer') {
-        email = 'organizer@eventsphere.ai';
-      } else if (targetRole === 'Volunteer') {
-        email = 'volunteer@eventsphere.ai';
-      }
-
-      const data = await authService.login(email, 'password123');
-      localStorage.setItem('eventsphere_token', data.token);
-      setToken(data.token);
-      setUser(data);
-      return { success: true, user: data };
-    } catch (err) {
-      console.warn('Quick role switch note:', err.message);
-      // Fallback local representation if backend is restarting
-      const mockUserData = {
-        name: targetRole === 'Organizer' ? 'Elena Rostova (Lead Organizer)' : 
-              targetRole === 'Volunteer' ? 'Sofia Chen (Gate Marshal)' : 'Aarav Patel (VIP Attendee)',
-        email: `${targetRole.toLowerCase()}@eventsphere.ai`,
-        role: targetRole,
-        _id: 'mock_user_' + targetRole.toLowerCase(),
-      };
-      setUser(mockUserData);
-    } finally {
-      setLoading(false);
-    }
-  };
-
   return (
     <AuthContext.Provider
       value={{
@@ -113,10 +103,18 @@ export const AuthProvider = ({ children }) => {
         token,
         loading,
         role: user?.role || 'Guest',
+        isAuthenticated: !!user,
         login,
         register,
         logout,
-        switchDemoRole,
+        // Modal Controls
+        isAuthModalOpen,
+        setIsAuthModalOpen,
+        authModalMode,
+        setAuthModalMode,
+        authModalInitialRole,
+        openAuthModal,
+        closeAuthModal,
       }}
     >
       {children}

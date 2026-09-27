@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useEvents } from '../context/EventContext';
+import { useAuth } from '../context/AuthContext';
 import { analyticsService } from '../services/analyticsService';
 import { StatusBadge, RoleBadge } from '../components/Badges';
 import { formatCurrency, formatDateTime, formatDate } from '../utils/formatters';
@@ -29,6 +30,8 @@ export const OrganizerDashboard = () => {
     setIsSentimentModalOpen,
     openRegisterModal,
   } = useEvents();
+
+  const { user, isAuthenticated, openAuthModal } = useAuth();
 
   const [statsData, setStatsData] = useState(null);
   const [loadingStats, setLoadingStats] = useState(false);
@@ -110,6 +113,24 @@ export const OrganizerDashboard = () => {
           </button>
         </div>
       </div>
+
+      {/* Role Reminder if guest or not Organizer */}
+      {(!isAuthenticated || user?.role !== 'Organizer') && (
+        <div className="p-4 bg-emerald-50/90 border border-emerald-200 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 text-emerald-950 font-medium">
+            <BarChart3 className="w-4 h-4 text-emerald-700 shrink-0" />
+            <span>
+              You are currently viewing Organizer Mission Control in preview mode. Sign in as an <strong>Organizer</strong> to publish events, dispatch volunteers, and access live gate telemetry.
+            </span>
+          </div>
+          <button
+            onClick={() => openAuthModal('login', 'Organizer')}
+            className="px-4 py-2 forest-pill-active rounded-xl font-bold text-xs shrink-0 shadow-xs"
+          >
+            Sign In as Organizer
+          </button>
+        </div>
+      )}
 
       {/* Event Selector Dropdown and Controls */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 glass-card p-4 rounded-3xl border border-white/80 shadow-glass">

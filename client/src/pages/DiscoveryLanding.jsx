@@ -19,7 +19,7 @@ import {
 
 export const DiscoveryLanding = () => {
   const { events, loadingEvents, openRegisterModal, openFeedbackModal, setActiveTab } = useEvents();
-  const { switchDemoRole } = useAuth();
+  const { user, isAuthenticated, openAuthModal } = useAuth();
 
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchQuery, setSearchQuery] = useState('');
@@ -67,12 +67,15 @@ export const DiscoveryLanding = () => {
             <strong className="text-emerald-900 font-bold">Razorpay</strong>.
           </p>
 
-          {/* Quick CTA Actions matching Image 1 buttons */}
+          {/* Quick CTA Actions */}
           <div className="flex flex-wrap items-center justify-center gap-3.5 pt-2">
             <button
               onClick={() => {
-                switchDemoRole('Organizer');
-                setActiveTab('organizer');
+                if (isAuthenticated && user?.role === 'Organizer') {
+                  setActiveTab('organizer');
+                } else {
+                  openAuthModal('login', 'Organizer');
+                }
               }}
               className="flex items-center gap-2 px-6 py-3 rounded-2xl forest-pill-active font-bold text-xs shadow-pill transition-all hover:scale-105"
             >
@@ -82,8 +85,11 @@ export const DiscoveryLanding = () => {
 
             <button
               onClick={() => {
-                switchDemoRole('Volunteer');
-                setActiveTab('volunteer');
+                if (isAuthenticated && (user?.role === 'Volunteer' || user?.role === 'Organizer')) {
+                  setActiveTab('volunteer');
+                } else {
+                  openAuthModal('login', 'Volunteer');
+                }
               }}
               className="flex items-center gap-2 px-6 py-3 rounded-2xl bg-white/90 hover:bg-white text-slate-800 border border-emerald-900/15 font-bold text-xs shadow-sm transition-all hover:scale-105"
             >

@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Html5Qrcode } from 'html5-qrcode';
+import jsQR from 'jsqr';
 import { passService } from '../services/passService';
 import { sound } from '../utils/sound';
 import { StatusBadge } from '../components/Badges';
-import { formatDateTime } from '../utils/formatters';
+import { useAuth } from '../context/AuthContext';
 import {
   ScanLine,
   Camera,
@@ -15,25 +15,36 @@ import {
   Sparkles,
   Play,
   Square,
+  AlertCircle,
+  UserCheck,
+  Shield,
+  RefreshCw,
 } from 'lucide-react';
 
 export const VolunteerScanner = () => {
+  const { user, isAuthenticated, openAuthModal } = useAuth();
+
   const [isCameraActive, setIsCameraActive] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
   const [scanResult, setScanResult] = useState(null);
   const [scanLogs, setScanLogs] = useState([]);
   const [loadingVerify, setLoadingVerify] = useState(false);
   const [manualPayload, setManualPayload] = useState('');
+  const [cameraError, setCameraError] = useState('');
 
-  const html5QrCodeRef = useRef(null);
+  // WebRTC & Scanner Refs
+  const videoRef = useRef(null);
+  const canvasRef = useRef(null);
+  const streamRef = useRef(null);
+  const scanAnimationRef = useRef(null);
+  const isPausedRef = useRef(false);
 
+  // Stop camera tracks cleanly on unmount
   useEffect(() => {
     return () => {
-      if (html5QrCodeRef.current && isCameraActive) {
-        html5QrCodeRef.current.stop().catch(console.warn);
-      }
+      stopCamera();
     };
-  }, [isCameraActive]);
+  }, []);
 
   const processScanData = async (rawString) => {
     setLoadingVerify(true);
@@ -50,6 +61,7 @@ export const VolunteerScanner = () => {
         throw new Error('QR code missing registration ID or dynamic TOTP token');
       }
 
+      // Verify scan with Node.js/MongoDB backend
       const response = await passService.verifyScan(payload.registrationId, payload.token);
 
       sound.playSuccess();
@@ -103,40 +115,127 @@ export const VolunteerScanner = () => {
     }
   };
 
-  const startCamera = async () => {
-    try {
-      const qrScanner = new Html5Qrcode('qr-reader-container');
-      html5QrCodeRef.current = qrScanner;
+  // Continuous QR scan loop using jsQR
+  const scanLoop = () => {
+    if (!videoRef.current || !streamRef.current) return;
 
-      await qrScanner.start(
-        { facingMode: 'environment' },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-        },
-        (decodedText) => {
-          qrScanner.pause();
-          processScanData(decodedText);
+    const video = videoRef.current;
+    if (video.readyState === video.HAVE_ENOUGH_DATA && !isPausedRef.current) {
+      try {
+        const canvas = canvasRef.current || document.createElement('canvas');
+        canvas.width = video.videoWidth || 640;
+        canvas.height = video.videoHeight || 480;
+        const ctx = canvas.getContext('2d', { willReadFrequently: true });
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
+        const code = jsQR(imageData.data, imageData.width, imageData.height, {
+          inversionAttempts: 'dontInvert',
+        });
+
+        if (code && code.data && code.data.trim()) {
+          isPausedRef.current = true;
+          processScanData(code.data.trim());
+
+          // Cooldown for 2.5s before allowing next scan
           setTimeout(() => {
-            if (qrScanner.getState() === 3) qrScanner.resume();
-          }, 3000);
+            isPausedRef.current = false;
+          }, 2500);
+        }
+      } catch (scanErr) {
+        // Continue scanning silently on transient frame read errors
+      }
+    }
+
+    scanAnimationRef.current = requestAnimationFrame(scanLoop);
+  };
+
+  // Direct WebRTC getUserMedia implementation
+  const startCamera = async () => {
+    setCameraError('');
+    try {
+      const constraints = {
+        video: {
+          facingMode: { ideal: 'environment' },
+          width: { ideal: 1280 },
+          height: { ideal: 720 },
         },
-        (error) => {}
-      );
+        audio: false,
+      };
+
+      let stream;
+      try {
+        stream = await navigator.mediaDevices.getUserMedia(constraints);
+      } catch (e) {
+        // Fallback for laptops/webcams without environment facing mode
+        stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+      }
+
+      streamRef.current = stream;
+
+      // Correctly bind media stream to the video element
+      if (videoRef.current) {
+        videoRef.current.srcObject = stream;
+        videoRef.current.setAttribute('playsinline', 'true');
+        await videoRef.current.play();
+      }
+
       setIsCameraActive(true);
+      isPausedRef.current = false;
+
+      // Launch real-time frame scanning loop
+      scanAnimationRef.current = requestAnimationFrame(scanLoop);
     } catch (err) {
-      console.warn('Camera initiation note:', err);
+      console.error('Camera stream initiation error:', err);
       setIsCameraActive(false);
+      setCameraError(
+        err.name === 'NotAllowedError'
+          ? 'Camera access permission denied. Please enable camera permissions in your browser.'
+          : err.name === 'NotFoundError'
+          ? 'No compatible camera hardware detected on this device.'
+          : `Camera error: ${err.message}`
+      );
     }
   };
 
-  const stopCamera = async () => {
-    if (html5QrCodeRef.current) {
-      await html5QrCodeRef.current.stop();
-      setIsCameraActive(false);
+  // Safe camera track teardown
+  const stopCamera = () => {
+    if (scanAnimationRef.current) {
+      cancelAnimationFrame(scanAnimationRef.current);
+      scanAnimationRef.current = null;
+    }
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach((track) => track.stop());
+      streamRef.current = null;
+    }
+    if (videoRef.current) {
+      videoRef.current.srcObject = null;
+    }
+    setIsCameraActive(false);
+    setTorchOn(false);
+  };
+
+  const toggleTorch = async () => {
+    if (!streamRef.current) return;
+    const track = streamRef.current.getVideoTracks()[0];
+    if (!track) return;
+
+    try {
+      const nextTorch = !torchOn;
+      const capabilities = track.getCapabilities?.() || {};
+      if (capabilities.torch) {
+        await track.applyConstraints({
+          advanced: [{ torch: nextTorch }],
+        });
+      }
+      setTorchOn(nextTorch);
+    } catch (err) {
+      console.warn('Torch constraint not supported by device:', err.message);
+      setTorchOn(!torchOn);
     }
   };
 
+  // Fast Presentation Simulators (Testing real MongoDB verification API)
   const handleSimulateValidScan = async () => {
     try {
       const passes = await passService.getMyPasses();
@@ -147,15 +246,18 @@ export const VolunteerScanner = () => {
           token: qr.token,
         });
         await processScanData(payloadString);
+      } else {
+        // Fallback with demo registration format
+        await processScanData(JSON.stringify({ registrationId: 'demo_reg_001', token: '123456' }));
       }
     } catch (e) {
-      console.error(e);
+      console.error('Simulate scan error:', e);
     }
   };
 
   const handleSimulateExpiredScan = async () => {
-    const passes = await passService.getMyPasses();
-    const regId = passes[0]?._id || 'seed_reg_demo';
+    const passes = await passService.getMyPasses().catch(() => []);
+    const regId = passes[0]?._id || 'demo_reg_seed';
     const payloadString = JSON.stringify({
       registrationId: regId,
       token: '000000',
@@ -164,11 +266,13 @@ export const VolunteerScanner = () => {
   };
 
   const handleSimulateDuplicateScan = async () => {
-    const passes = await passService.getMyPasses();
+    const passes = await passService.getMyPasses().catch(() => []);
     if (passes.length > 0) {
       const qr = await passService.getDynamicQR(passes[0]._id);
       await passService.verifyScan(passes[0]._id, qr.token).catch(() => {});
       await processScanData(JSON.stringify({ registrationId: passes[0]._id, token: qr.token }));
+    } else {
+      await processScanData(JSON.stringify({ registrationId: 'demo_reg_seed', token: '999999' }));
     }
   };
 
@@ -184,18 +288,45 @@ export const VolunteerScanner = () => {
             <h1 className="text-2xl font-extrabold text-slate-900">Volunteer Gate Scanner</h1>
           </div>
           <p className="text-xs text-slate-600">
-            High-speed TOTP Dynamic Pass inspection, anti-proxy token verification & entry check-in
+            Hardware-accelerated TOTP Dynamic Pass inspection, anti-proxy token verification & entry check-in
           </p>
         </div>
 
-        <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold text-xs shadow-xs">
-          <span className="flex h-2.5 w-2.5 relative">
-            <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
-            <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
-          </span>
-          <span>Turnstile Gate 01 Online</span>
+        <div className="flex items-center gap-3">
+          {isAuthenticated && (
+            <div className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-slate-100 text-slate-700 text-xs font-semibold">
+              <UserCheck className="w-3.5 h-3.5 text-emerald-700" />
+              <span>Marshal: {user?.name?.split(' ')[0]}</span>
+            </div>
+          )}
+
+          <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-100 border border-emerald-300 text-emerald-900 font-bold text-xs shadow-xs">
+            <span className="flex h-2.5 w-2.5 relative">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-500 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-emerald-600"></span>
+            </span>
+            <span>Turnstile Gate 01 Online</span>
+          </div>
         </div>
       </div>
+
+      {/* Role Reminder if guest */}
+      {!isAuthenticated && (
+        <div className="p-4 bg-emerald-50/90 border border-emerald-200 rounded-3xl flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 text-xs">
+          <div className="flex items-center gap-2.5 text-emerald-950 font-medium">
+            <Shield className="w-4 h-4 text-emerald-700 shrink-0" />
+            <span>
+              Operating in Standalone Gate Mode. Sign in as an official <strong>Volunteer</strong> or <strong>Organizer</strong> to link scans to your staff profile.
+            </span>
+          </div>
+          <button
+            onClick={() => openAuthModal('login', 'Volunteer')}
+            className="px-4 py-2 forest-pill-active rounded-xl font-bold text-xs shrink-0 shadow-xs"
+          >
+            Sign In as Volunteer
+          </button>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Left Column: Mobile Camera Viewport Mockup */}
@@ -205,10 +336,19 @@ export const VolunteerScanner = () => {
 
             {/* Viewport Screen */}
             <div className="relative w-full h-[400px] bg-slate-900 rounded-[28px] overflow-hidden flex flex-col items-center justify-center border border-slate-800">
-              <div
-                id="qr-reader-container"
-                className={`w-full h-full object-cover ${isCameraActive ? 'block' : 'hidden'}`}
-              ></div>
+              {/* WebRTC Video Stream binding */}
+              <video
+                ref={videoRef}
+                playsInline
+                autoPlay
+                muted
+                className={`w-full h-full object-cover rounded-[28px] ${
+                  isCameraActive ? 'block' : 'hidden'
+                }`}
+              />
+
+              {/* Offscreen frame capture canvas */}
+              <canvas ref={canvasRef} className="hidden" />
 
               {!isCameraActive && (
                 <div className="absolute inset-0 flex flex-col items-center justify-center p-6 text-center space-y-4">
@@ -219,9 +359,14 @@ export const VolunteerScanner = () => {
                   <div>
                     <h3 className="text-sm font-bold text-slate-200">Camera Viewport Idle</h3>
                     <p className="text-[11px] text-slate-400 mt-1 max-w-[200px]">
-                      Align attendee's 30s Dynamic QR Pass inside the target frame
+                      Click below to activate live WebCam stream and align attendee's 30s Dynamic QR Pass
                     </p>
                   </div>
+                  {cameraError && (
+                    <div className="p-2.5 bg-rose-950/80 border border-rose-500/40 rounded-xl text-[11px] text-rose-300 max-w-[260px]">
+                      {cameraError}
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -230,18 +375,18 @@ export const VolunteerScanner = () => {
               {/* Top Viewport Toolbar */}
               <div className="absolute top-3 left-3 right-3 z-30 flex items-center justify-between pointer-events-auto">
                 <span className="bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-mono text-emerald-400 flex items-center gap-1.5 border border-emerald-500/30">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400"></span>
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   TOTP Engine Active
                 </span>
 
                 <button
-                  onClick={() => setTorchOn(!torchOn)}
-                  className={`p-2 rounded-full backdrop-blur-md border ${
+                  onClick={toggleTorch}
+                  className={`p-2 rounded-full backdrop-blur-md border transition-all ${
                     torchOn
-                      ? 'bg-amber-400 text-slate-950 border-amber-300'
-                      : 'bg-black/60 text-slate-300 border-slate-700'
+                      ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md'
+                      : 'bg-black/60 text-slate-300 border-slate-700 hover:text-white'
                   }`}
-                  title="Toggle Torch"
+                  title="Toggle Flash / Torch"
                 >
                   <Flashlight className="w-4 h-4" />
                 </button>

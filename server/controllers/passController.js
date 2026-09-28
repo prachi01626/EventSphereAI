@@ -59,7 +59,18 @@ const getDynamicPassQR = async (req, res, next) => {
 // @access  Private (Volunteer or Organizer)
 const verifyPassScan = async (req, res, next) => {
   try {
-    const { registrationId, token } = req.body;
+    let { registrationId, token } = req.body;
+
+    if ((!registrationId || !token) && req.body.qrData) {
+      try {
+        const parsed = typeof req.body.qrData === 'string' ? JSON.parse(req.body.qrData) : req.body.qrData;
+        registrationId = registrationId || parsed.registrationId || parsed._id || parsed.id;
+        token = token || parsed.token || parsed.totp || parsed.code;
+      } catch (err) {
+        // Fallback for non-JSON QR data
+        if (!registrationId) registrationId = req.body.qrData;
+      }
+    }
 
     if (!registrationId || !token) {
       return res.status(400).json({
@@ -70,7 +81,7 @@ const verifyPassScan = async (req, res, next) => {
     }
 
     const registration = await Registration.findById(registrationId)
-      .populate('event', 'title date venue organizer')
+      .populate('event', 'title date venue organizer organizerId volunteerCode volunteers')
       .populate('participant', 'name email');
 
     if (!registration) {
@@ -79,6 +90,43 @@ const verifyPassScan = async (req, res, next) => {
         status: 'NOT_FOUND',
         message: 'Invalid pass: Registration record does not exist',
       });
+    }
+
+    const event = registration.event;
+    if (!event) {
+      return res.status(404).json({
+        valid: false,
+        status: 'EVENT_NOT_FOUND',
+        message: 'Associated event record does not exist',
+      });
+    }
+
+    // Role-based Event Authorization Check:
+    if (req.user.role === 'Volunteer') {
+      const userAssignedEvents = (req.user.assignedEvents || []).map((id) => id.toString());
+      const eventVolunteers = (event.volunteers || []).map((id) => id.toString());
+      const eventIdStr = event._id.toString();
+
+      const isAuthorizedVolunteer =
+        userAssignedEvents.includes(eventIdStr) ||
+        eventVolunteers.includes(req.user._id.toString());
+
+      if (!isAuthorizedVolunteer) {
+        return res.status(403).json({
+          valid: false,
+          status: 'UNAUTHORIZED_EVENT',
+          message: `Unauthorized: You are not an assigned volunteer for "${event.title}". You can only scan and verify tickets for events you are linked to.`,
+        });
+      }
+    } else if (req.user.role === 'Organizer') {
+      const eventOrganizerId = event.organizerId || event.organizer;
+      if (eventOrganizerId && eventOrganizerId.toString() !== req.user._id.toString()) {
+        return res.status(403).json({
+          valid: false,
+          status: 'UNAUTHORIZED_EVENT',
+          message: 'Unauthorized: You can only scan and verify tickets for your own events.',
+        });
+      }
     }
 
     if (registration.paymentStatus !== 'Completed') {

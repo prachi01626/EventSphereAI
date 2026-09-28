@@ -26,6 +26,12 @@ const userSchema = new mongoose.Schema(
       enum: ['Organizer', 'Participant', 'Volunteer'],
       default: 'Participant',
     },
+    assignedEvents: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Event',
+      },
+    ],
   },
   {
     timestamps: true,

@@ -132,6 +132,8 @@ export const AuthProvider = ({ children }) => {
         email: userData.email?.trim(),
         password: userData.password,
         role: userData.role || 'Participant', // Organizer, Participant, Volunteer
+        organizerKey: userData.organizerKey,
+        volunteerCode: userData.volunteerCode,
       });
 
       const { token: receivedToken, ...initialUserData } = response.data;

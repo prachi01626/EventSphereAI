@@ -30,4 +30,19 @@ export const eventService = {
     const response = await API.post('/events/copilot', copilotData);
     return response.data;
   },
+
+  getOrganizerEvents: async () => {
+    const response = await API.get('/events/organizer/my-events');
+    return response.data;
+  },
+
+  getEventAnalytics: async (id) => {
+    const response = await API.get(`/events/${id}/analytics`);
+    return response.data;
+  },
+
+  getEventParticipants: async (id) => {
+    const response = await API.get(`/events/${id}/participants`);
+    return response.data;
+  },
 };

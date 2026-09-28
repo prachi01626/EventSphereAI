@@ -53,6 +53,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/payment', paymentRoutes);
 app.use('/api/pass', passRoutes);
 app.use('/api/volunteers', volunteerRoutes);
+app.use('/api/volunteer', volunteerRoutes); // Alias for singular route
 app.use('/api/analytics', analyticsRoutes);
 
 // Direct /api/ai routes
@@ -110,6 +111,9 @@ const seedInitialData = async () => {
         ],
         promotionalCopy: 'Experience the cutting-edge of enterprise intelligence at the Global AI Summit 2026. Secure your pass today!',
         organizer: organizer._id,
+        organizerId: organizer._id,
+        volunteerCode: '123456',
+        volunteers: [volunteer._id],
       });
 
       const event2 = await Event.create({
@@ -133,6 +137,9 @@ const seedInitialData = async () => {
         ],
         promotionalCopy: 'Hack the impossible in 36 hours. Free registration, world-class mentorship, and high-impact prizes.',
         organizer: organizer._id,
+        organizerId: organizer._id,
+        volunteerCode: '654321',
+        volunteers: [volunteer._id],
       });
 
       const event3 = await Event.create({
@@ -154,7 +161,14 @@ const seedInitialData = async () => {
         ],
         promotionalCopy: 'Master modern spatial design and level up your product aesthetics with industry leaders.',
         organizer: organizer._id,
+        organizerId: organizer._id,
+        volunteerCode: '888999',
+        volunteers: [],
       });
+
+      // Link volunteer to initial seeded events
+      volunteer.assignedEvents = [event1._id, event2._id];
+      await volunteer.save();
 
       // 3. Pre-create an active completed registration with Dynamic Pass for instant demonstration
       const demoSecret = generateSecret();

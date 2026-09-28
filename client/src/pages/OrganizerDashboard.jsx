@@ -152,6 +152,15 @@ export const OrganizerDashboard = () => {
               </option>
             ))}
           </select>
+
+          {activeEvent?.volunteerCode && (
+            <div className="hidden md:flex items-center gap-2 px-3 py-1.5 bg-emerald-50 border border-emerald-200 rounded-2xl text-xs text-emerald-900 font-semibold shadow-xs">
+              <span className="text-emerald-700">Volunteer Code:</span>
+              <span className="font-mono font-extrabold tracking-widest text-emerald-800 bg-white px-2 py-0.5 rounded-lg border border-emerald-300">
+                {activeEvent.volunteerCode}
+              </span>
+            </div>
+          )}
         </div>
 
         {/* 1-Click Excel Export Button */}

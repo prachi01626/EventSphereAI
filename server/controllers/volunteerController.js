@@ -110,6 +110,74 @@ const allocateVolunteers = async (req, res, next) => {
   }
 };
 
+const Event = require('../models/Event');
+const User = require('../models/User');
+
+// @desc    Link volunteer to an event using organizer's 6-digit volunteerCode
+// @route   POST /api/volunteers/link-event
+// @access  Private (Volunteer)
+const linkVolunteerToEvent = async (req, res, next) => {
+  try {
+    const { volunteerCode } = req.body;
+    if (!volunteerCode || !volunteerCode.trim()) {
+      return res.status(400).json({ message: 'Please provide a 6-digit volunteer code' });
+    }
+
+    const codeStr = volunteerCode.toString().trim();
+    const event = await Event.findOne({
+      $or: [{ volunteerCode: codeStr }, { volunteerCode: Number(codeStr) }],
+    });
+    if (!event) {
+      return res.status(404).json({ message: 'Invalid Volunteer Code: No matching event found' });
+    }
+
+    // Add event to volunteer user assignedEvents
+    const user = await User.findById(req.user._id);
+    if (!user.assignedEvents) user.assignedEvents = [];
+    const eventIdStr = event._id.toString();
+    if (!user.assignedEvents.some((id) => id.toString() === eventIdStr)) {
+      user.assignedEvents.push(event._id);
+      await user.save();
+    }
+
+    // Add volunteer to event.volunteers
+    if (!event.volunteers) event.volunteers = [];
+    const userIdStr = req.user._id.toString();
+    if (!event.volunteers.some((id) => id.toString() === userIdStr)) {
+      event.volunteers.push(req.user._id);
+      await event.save();
+    }
+
+    res.status(200).json({
+      success: true,
+      message: `Successfully linked to event: ${event.title}`,
+      event: {
+        _id: event._id,
+        title: event.title,
+        venue: event.venue,
+        date: event.date,
+        volunteerCode: event.volunteerCode,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get events assigned to authenticated volunteer
+// @route   GET /api/volunteers/my-events
+// @access  Private (Volunteer)
+const getVolunteerAssignedEvents = async (req, res, next) => {
+  try {
+    const user = await User.findById(req.user._id).populate('assignedEvents');
+    res.status(200).json(user?.assignedEvents || []);
+  } catch (error) {
+    next(error);
+  }
+};
+
 module.exports = {
   allocateVolunteers,
+  linkVolunteerToEvent,
+  getVolunteerAssignedEvents,
 };

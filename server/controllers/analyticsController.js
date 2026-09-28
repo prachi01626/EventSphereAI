@@ -54,6 +54,13 @@ const getEventStats = async (req, res, next) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
+    const eventOrganizerId = event.organizerId || event.organizer;
+    if (req.user && req.user.role === 'Organizer' && eventOrganizerId && eventOrganizerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        message: 'Unauthorized: You can only view data for your own events',
+      });
+    }
+
     const registrations = await Registration.find({ event: eventId }).populate('participant', 'name email');
     const feedbacks = await Feedback.find({ event: eventId });
 
@@ -227,6 +234,13 @@ const exportRegistrationsExcel = async (req, res, next) => {
     const event = await Event.findById(eventId);
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
+    }
+
+    const eventOrganizerId = event.organizerId || event.organizer;
+    if (req.user && req.user.role === 'Organizer' && eventOrganizerId && eventOrganizerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        message: 'Unauthorized: You can only view data for your own events',
+      });
     }
 
     const registrations = await Registration.find({ event: eventId })

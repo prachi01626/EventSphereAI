@@ -1,7 +1,9 @@
 const Event = require('../models/Event');
+const Registration = require('../models/Registration');
+const Feedback = require('../models/Feedback');
 const { GoogleGenerativeAI } = require('@google/generative-ai');
 
-// @desc    Get all events
+// @desc    Get all public events
 // @route   GET /api/events
 // @access  Public
 const getEvents = async (req, res, next) => {
@@ -23,6 +25,7 @@ const getEvents = async (req, res, next) => {
 
     const events = await Event.find(query)
       .populate('organizer', 'name email')
+      .populate('organizerId', 'name email')
       .sort({ date: 1 });
     res.json(events);
   } catch (error) {
@@ -35,7 +38,9 @@ const getEvents = async (req, res, next) => {
 // @access  Public
 const getEventById = async (req, res, next) => {
   try {
-    const event = await Event.findById(req.params.id).populate('organizer', 'name email');
+    const event = await Event.findById(req.params.id)
+      .populate('organizer', 'name email')
+      .populate('organizerId', 'name email');
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
@@ -45,7 +50,112 @@ const getEventById = async (req, res, next) => {
   }
 };
 
-// @desc    Create new event
+// @desc    Get events strictly owned by the authenticated organizer
+// @route   GET /api/events/organizer/my-events
+// @access  Private (Organizer)
+const getOrganizerEvents = async (req, res, next) => {
+  try {
+    const events = await Event.find({
+      $or: [{ organizerId: req.user._id }, { organizer: req.user._id }],
+    })
+      .populate('volunteers', 'name email')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json(events);
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get event analytics with strict organizer ownership check
+// @route   GET /api/events/:id/analytics
+// @access  Private (Organizer)
+const getEventAnalytics = async (req, res, next) => {
+  try {
+    const event = await Event.findById(req.params.id);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    const eventOrganizerId = event.organizerId || event.organizer;
+    if (!eventOrganizerId || eventOrganizerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        message: 'Unauthorized: You can only view data for your own events',
+      });
+    }
+
+    const registrations = await Registration.find({ event: event._id }).populate('participant', 'name email');
+    const feedbacks = await Feedback.find({ event: event._id });
+
+    const totalRegistrations = registrations.length;
+    const checkedInCount = registrations.filter((r) => r.checkInStatus).length;
+    const paidCount = registrations.filter((r) => r.paymentStatus === 'Completed').length;
+    const totalRevenue = paidCount * (event.ticketPrice || 0);
+    const attendanceRate = totalRegistrations > 0 ? Math.round((checkedInCount / totalRegistrations) * 100) : 0;
+    const avgRating =
+      feedbacks.length > 0
+        ? (feedbacks.reduce((sum, f) => sum + f.rating, 0) / feedbacks.length).toFixed(1)
+        : '5.0';
+
+    res.status(200).json({
+      success: true,
+      event: {
+        _id: event._id,
+        title: event.title,
+        date: event.date,
+        venue: event.venue,
+        ticketPrice: event.ticketPrice,
+        budget: event.budget,
+        volunteerCode: event.volunteerCode,
+      },
+      metrics: {
+        totalRegistrations,
+        checkedInCount,
+        paidCount,
+        totalRevenue,
+        attendanceRate,
+        feedbackCount: feedbacks.length,
+        avgRating,
+      },
+      registrations,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get registered participants with strict organizer ownership check
+// @route   GET /api/events/:id/participants
+// @access  Private (Organizer)
+const getEventParticipants = async (req, res, next) => {
+  try {
+    const event = await Event.findById(req.params.id);
+    if (!event) {
+      return res.status(404).json({ message: 'Event not found' });
+    }
+
+    const eventOrganizerId = event.organizerId || event.organizer;
+    if (!eventOrganizerId || eventOrganizerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({
+        message: 'Unauthorized: You can only view data for your own events',
+      });
+    }
+
+    const registrations = await Registration.find({ event: event._id })
+      .populate('participant', 'name email role')
+      .sort({ createdAt: -1 });
+
+    res.status(200).json({
+      success: true,
+      count: registrations.length,
+      participants: registrations,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Create new event with auto-generated 6-digit volunteerCode
 // @route   POST /api/events/create
 // @access  Private (Organizer)
 const createEvent = async (req, res, next) => {
@@ -67,6 +177,8 @@ const createEvent = async (req, res, next) => {
       return res.status(400).json({ message: 'Please provide all mandatory event details' });
     }
 
+    const volunteerCode = Math.floor(100000 + Math.random() * 900000).toString();
+
     const event = await Event.create({
       title,
       description,
@@ -78,7 +190,10 @@ const createEvent = async (req, res, next) => {
       agenda: agenda || [],
       customFormFields: customFormFields || [],
       promotionalCopy: promotionalCopy || '',
+      organizerId: req.user._id,
       organizer: req.user._id,
+      volunteerCode,
+      volunteers: [],
     });
 
     res.status(201).json(event);
@@ -87,7 +202,7 @@ const createEvent = async (req, res, next) => {
   }
 };
 
-// @desc    Update event
+// @desc    Update event with strict organizer ownership check
 // @route   PUT /api/events/:id
 // @access  Private (Organizer)
 const updateEvent = async (req, res, next) => {
@@ -97,8 +212,9 @@ const updateEvent = async (req, res, next) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
-    if (event.organizer.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized to update this event' });
+    const eventOrganizerId = event.organizerId || event.organizer;
+    if (!eventOrganizerId || eventOrganizerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Unauthorized: You can only view data for your own events' });
     }
 
     event = await Event.findByIdAndUpdate(req.params.id, req.body, { new: true });
@@ -108,7 +224,7 @@ const updateEvent = async (req, res, next) => {
   }
 };
 
-// @desc    Delete event
+// @desc    Delete event with strict organizer ownership check
 // @route   DELETE /api/events/:id
 // @access  Private (Organizer)
 const deleteEvent = async (req, res, next) => {
@@ -118,8 +234,9 @@ const deleteEvent = async (req, res, next) => {
       return res.status(404).json({ message: 'Event not found' });
     }
 
-    if (event.organizer.toString() !== req.user._id.toString()) {
-      return res.status(403).json({ message: 'Not authorized to delete this event' });
+    const eventOrganizerId = event.organizerId || event.organizer;
+    if (!eventOrganizerId || eventOrganizerId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Unauthorized: You can only view data for your own events' });
     }
 
     await Event.findByIdAndDelete(req.params.id);
@@ -263,4 +380,7 @@ module.exports = {
   updateEvent,
   deleteEvent,
   generateEventCopilot,
+  getOrganizerEvents,
+  getEventAnalytics,
+  getEventParticipants,
 };

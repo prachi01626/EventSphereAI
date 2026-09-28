@@ -37,15 +37,19 @@ export const AuthModal = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [organizerKey, setOrganizerKey] = useState('');
+  const [volunteerCode, setVolunteerCode] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Sync mode and initial role when modal opens
+  // Sync mode and initial role when modal opens (Always default to Participant on register)
   useEffect(() => {
     if (isAuthModalOpen) {
       setMode(authModalMode || 'login');
-      setRole(authModalInitialRole || 'Participant');
+      setRole(authModalMode === 'register' ? 'Participant' : authModalInitialRole || 'Participant');
+      setOrganizerKey('');
+      setVolunteerCode('');
       setErrorMessage('');
       setSuccessMessage('');
     }
@@ -79,11 +83,25 @@ export const AuthModal = () => {
           return;
         }
 
+        if (role === 'Organizer' && !organizerKey.trim()) {
+          setErrorMessage('Please enter the Organizer Passcode to register as an Organizer');
+          setIsSubmitting(false);
+          return;
+        }
+
+        if (role === 'Volunteer' && !volunteerCode.trim()) {
+          setErrorMessage('Please enter the 6-digit Event Volunteer Code provided by your organizer');
+          setIsSubmitting(false);
+          return;
+        }
+
         const result = await register({
           name: name.trim(),
           email: email.trim(),
           password,
           role,
+          organizerKey: organizerKey.trim(),
+          volunteerCode: volunteerCode.trim(),
         });
 
         if (result.success) {
@@ -253,6 +271,59 @@ export const AuthModal = () => {
                   </button>
                 </div>
               </div>
+
+              {/* Conditional Secret Key Input for Organizer */}
+              {role === 'Organizer' && (
+                <div className="p-3 bg-amber-50/70 border border-amber-200 rounded-2xl animate-fadeIn space-y-1.5">
+                  <label className="block text-xs font-bold text-amber-900 flex items-center justify-between">
+                    <span>Organizer Secret Key</span>
+                    <span className="text-[10px] bg-amber-200 text-amber-900 px-1.5 py-0.5 rounded font-mono">
+                      Passcode
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <ShieldCheck className="w-4 h-4 text-amber-600 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="password"
+                      required
+                      value={organizerKey}
+                      onChange={(e) => setOrganizerKey(e.target.value)}
+                      placeholder="Enter Organizer Passcode (e.g., ORG2026)"
+                      className="w-full bg-white border border-amber-300 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-amber-600 shadow-xs"
+                    />
+                  </div>
+                  <p className="text-[10px] text-amber-700">
+                    Restricted signup: Enter the master secret key to create an Organizer account.
+                  </p>
+                </div>
+              )}
+
+              {/* Conditional Event Volunteer Code Input for Volunteer */}
+              {role === 'Volunteer' && (
+                <div className="p-3 bg-emerald-50/70 border border-emerald-200 rounded-2xl animate-fadeIn space-y-1.5">
+                  <label className="block text-xs font-bold text-emerald-900 flex items-center justify-between">
+                    <span>Event Volunteer Code</span>
+                    <span className="text-[10px] bg-emerald-200 text-emerald-900 px-1.5 py-0.5 rounded font-mono">
+                      6-Digits
+                    </span>
+                  </label>
+                  <div className="relative">
+                    <QrCode className="w-4 h-4 text-emerald-700 absolute left-3.5 top-1/2 -translate-y-1/2" />
+                    <input
+                      type="text"
+                      required
+                      maxLength={6}
+                      value={volunteerCode}
+                      onChange={(e) => setVolunteerCode(e.target.value.trim())}
+                      placeholder="6-Digit Event Code (e.g. 123456)"
+                      className="w-full bg-white border border-emerald-300 rounded-xl pl-10 pr-4 py-2 text-xs text-slate-800 placeholder-slate-400 focus:outline-none focus:border-emerald-600 shadow-xs tracking-wider font-mono font-bold"
+                    />
+                  </div>
+                  <p className="text-[10px] text-emerald-700">
+                    Volunteers link directly to a specific event via the 6-digit code from the event organizer.
+                  </p>
+                </div>
+              )}
             </>
           )}
 

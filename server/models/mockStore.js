@@ -71,24 +71,26 @@ class MockQuery {
   }
 
   _execute() {
-    let results = this.sourceList.filter(item => {
+    let results = this.sourceList.filter((item) => {
       for (const [key, val] of Object.entries(this.query)) {
         if (key === '$or' && Array.isArray(val)) {
-          const matchesOr = val.some(subQuery => {
+          const matchesOr = val.some((subQuery) => {
             for (const [sKey, sVal] of Object.entries(subQuery)) {
               if (sVal && sVal.$regex) {
                 const regex = new RegExp(sVal.$regex, sVal.$options || '');
                 if (item[sKey] && regex.test(item[sKey])) return true;
-              } else if (item[sKey] === sVal) {
+              } else if (item[sKey]?.toString() === sVal?.toString()) {
                 return true;
               }
             }
             return false;
           });
           if (!matchesOr) return false;
+        } else if (val && typeof val === 'object' && val.$in && Array.isArray(val.$in)) {
+          if (!val.$in.some((inVal) => inVal?.toString() === item[key]?.toString())) return false;
         } else if (val && typeof val === 'object' && val.toString) {
           if (item[key]?.toString() !== val.toString()) return false;
-        } else if (item[key] !== val) {
+        } else if (item[key]?.toString() !== val?.toString()) {
           return false;
         }
       }
@@ -104,21 +106,38 @@ class MockQuery {
     }
 
     // Populate
-    results = results.map(item => {
+    results = results.map((item) => {
       const clone = Object.assign(Object.create(Object.getPrototypeOf(item)), item);
       for (const p of this.populateFields) {
-        if (p.field === 'organizer') {
-          clone.organizer = collections.users.find(u => u._id.toString() === (item.organizer?._id || item.organizer)?.toString()) || null;
+        if (p.field === 'organizer' || p.field === 'organizerId') {
+          clone[p.field] =
+            collections.users.find(
+              (u) => u._id.toString() === (item[p.field]?._id || item[p.field])?.toString()
+            ) || null;
         } else if (p.field === 'participant') {
-          clone.participant = collections.users.find(u => u._id.toString() === (item.participant?._id || item.participant)?.toString()) || null;
+          clone.participant =
+            collections.users.find(
+              (u) => u._id.toString() === (item.participant?._id || item.participant)?.toString()
+            ) || null;
         } else if (p.field === 'event') {
-          clone.event = collections.events.find(e => e._id.toString() === (item.event?._id || item.event)?.toString()) || null;
+          clone.event =
+            collections.events.find(
+              (e) => e._id.toString() === (item.event?._id || item.event)?.toString()
+            ) || null;
+        } else if (p.field === 'assignedEvents') {
+          clone.assignedEvents = (item.assignedEvents || [])
+            .map((evId) => collections.events.find((e) => e._id.toString() === (evId?._id || evId)?.toString()) || evId)
+            .filter(Boolean);
+        } else if (p.field === 'volunteers') {
+          clone.volunteers = (item.volunteers || [])
+            .map((vId) => collections.users.find((u) => u._id.toString() === (vId?._id || vId)?.toString()) || vId)
+            .filter(Boolean);
         }
       }
       return clone;
     });
 
-    return this.isSingle ? (results[0] || null) : results;
+    return this.isSingle ? results[0] || null : results;
   }
 
   then(resolve, reject) {

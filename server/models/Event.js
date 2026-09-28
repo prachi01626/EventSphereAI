@@ -51,11 +51,31 @@ const eventSchema = new mongoose.Schema(
       type: String,
       default: '',
     },
-    organizer: {
+    organizerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: 'User',
       required: true,
+      default: function () {
+        return this.organizer;
+      },
     },
+    organizer: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: 'User',
+      default: function () {
+        return this.organizerId;
+      },
+    },
+    volunteerCode: {
+      type: String,
+      default: () => Math.floor(100000 + Math.random() * 900000).toString(),
+    },
+    volunteers: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User',
+      },
+    ],
   },
   {
     timestamps: true,

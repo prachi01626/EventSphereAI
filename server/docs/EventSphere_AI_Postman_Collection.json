@@ -1,0 +1,334 @@
+{
+  "info": {
+    "_postman_id": "eventsphere-ai-collection-id-2026",
+    "name": "EventSphere AI - API Documentation & Endpoints",
+    "description": "Complete REST API collection for EventSphere AI MERN Stack platform including Auth, Events, Dynamic Passes, Volunteer Verification, and AI Copilot services.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5000",
+      "type": "string"
+    },
+    {
+      "key": "authToken",
+      "value": "YOUR_JWT_TOKEN_HERE",
+      "type": "string"
+    }
+  ],
+  "item": [
+    {
+      "name": "1. Authentication Services (/api/auth)",
+      "item": [
+        {
+          "name": "Register User (Organizer / Participant / Volunteer)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Prachi Sharma\",\n  \"email\": \"prachi@eventsphere.ai\",\n  \"password\": \"password123\",\n  \"role\": \"Organizer\",\n  \"organizerKey\": \"ORG2026\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Register new account with optional Organizer Key validation."
+          }
+        },
+        {
+          "name": "Login User",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"prachi@eventsphere.ai\",\n  \"password\": \"password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticate user and return JWT Bearer Token."
+          }
+        },
+        {
+          "name": "Get Current User Profile (/me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "me"
+              ]
+            },
+            "description": "Fetch active user session details using JWT token."
+          }
+        }
+      ]
+    },
+    {
+      "name": "2. Event Management (/api/events)",
+      "item": [
+        {
+          "name": "Get All Events (Isolated by Organizer ID)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/events",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "events"
+              ]
+            },
+            "description": "Fetch list of events owned by the authenticated organizer."
+          }
+        },
+        {
+          "name": "Create Event",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Build with Bharat Hackathon 2026\",\n  \"description\": \"National level AI & MERN stack hackathon.\",\n  \"category\": \"Technical\",\n  \"date\": \"2026-10-15\",\n  \"location\": \"Auditorium Hall A\",\n  \"ticketPrice\": 299,\n  \"capacity\": 500\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/events/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "events",
+                "create"
+              ]
+            },
+            "description": "Create new event linked to current Organizer ID."
+          }
+        },
+        {
+          "name": "AI Copilot - Generate Event Details",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"prompt\": \"Create a 2-day AI robotics workshop with schedule, agenda, and targeted audience.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/events/copilot",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "events",
+                "copilot"
+              ]
+            },
+            "description": "Use Gemini 1.5 Flash API to generate automated event description and agenda."
+          }
+        }
+      ]
+    },
+    {
+      "name": "3. Passes & Registrations (/api/passes)",
+      "item": [
+        {
+          "name": "Register for Event (Generate Dynamic Pass)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"65a000000000000000000001\",\n  \"paymentMethod\": \"Razorpay\",\n  \"paymentId\": \"pay_P102938475\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/passes/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "passes",
+                "register"
+              ]
+            },
+            "description": "Creates registration record and initializes TOTP dynamic QR pass."
+          }
+        },
+        {
+          "name": "Get My Digital Passes",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/passes/my-passes",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "passes",
+                "my-passes"
+              ]
+            },
+            "description": "Fetch active event passes for logged-in participant."
+          }
+        }
+      ]
+    },
+    {
+      "name": "4. Volunteer Gate Check-In (/api/volunteer)",
+      "item": [
+        {
+          "name": "Verify TOTP Pass (Gate Scanner)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"qrToken\": \"totp_token_string_or_pass_id\",\n  \"scannerLocation\": \"Main Gate Gate 1\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/volunteer/verify-pass",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "volunteer",
+                "verify-pass"
+              ]
+            },
+            "description": "Validates 30-second rotating QR code. Returns HTTP 200 (Valid), HTTP 400 (Expired/Duplicate)."
+          }
+        }
+      ]
+    },
+    {
+      "name": "5. AI Analytics & Operations (/api/ai)",
+      "item": [
+        {
+          "name": "AI Post-Event Sentiment Analysis",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"65a000000000000000000001\",\n  \"feedbacks\": [\n    \"The technical workshop was super insightful!\",\n    \"Entry queue was a bit slow at Gate 2.\"\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/ai/sentiment",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "ai",
+                "sentiment"
+              ]
+            },
+            "description": "Processes participant reviews and produces sentiment breakdown summary."
+          }
+        }
+      ]
+    }
+  ]
+}

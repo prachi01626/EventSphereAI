@@ -176,8 +176,12 @@ const getVolunteerAssignedEvents = async (req, res, next) => {
   }
 };
 
+const { verifyPassScan } = require('./passController');
+
 module.exports = {
   allocateVolunteers,
   linkVolunteerToEvent,
   getVolunteerAssignedEvents,
+  verifyPassScan,
+  verifyPass: verifyPassScan,
 };

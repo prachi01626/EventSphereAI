@@ -12,10 +12,20 @@ export const passService = {
   },
 
   verifyScan: async (registrationId, token) => {
-    const response = await API.post('/pass/verify-scan', {
+    const payload = {
       registrationId,
+      passId: registrationId,
       token,
-    });
-    return response.data;
+    };
+    try {
+      const response = await API.post('/volunteer/verify-pass', payload);
+      return response.data;
+    } catch (err) {
+      if (err.response?.status === 404) {
+        const response = await API.post('/pass/verify-scan', payload);
+        return response.data;
+      }
+      throw err;
+    }
   },
 };

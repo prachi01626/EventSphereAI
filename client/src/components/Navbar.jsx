@@ -55,7 +55,7 @@ export const Navbar = () => {
   };
 
   return (
-    <header className="glass-panel border-b border-white/60 sticky top-0 z-40 shadow-glass">
+    <header className="glass-panel border-b border-white/60 sticky top-0 z-40 shadow-glass transform-gpu will-change-transform">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-18 py-2">
           {/* Brand Logo with 3D Glowing Sphere */}

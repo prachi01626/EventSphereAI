@@ -186,7 +186,7 @@ export const EventRegistrationModal = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/40 backdrop-blur-md overflow-y-auto">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/70 backdrop-blur-sm overflow-y-auto">
       <div className="relative w-full max-w-lg rounded-3xl bg-white/95 p-6 md:p-8 shadow-2xl border border-white my-8 text-slate-800">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-emerald-900/10">

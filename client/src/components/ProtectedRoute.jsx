@@ -24,7 +24,7 @@ export const ProtectedRoute = ({
       <div className="glass-panel p-8 sm:p-10 rounded-3xl border border-white/80 shadow-glass flex flex-col items-center justify-center space-y-5 max-w-sm w-full mx-4 animate-fadeIn">
         <div className="relative flex items-center justify-center">
           {/* Ambient Pastel Emerald/Sage Glow Blur */}
-          <div className="absolute w-28 h-28 rounded-full bg-gradient-to-tr from-emerald-400/40 via-teal-300/30 to-sage-400/40 blur-xl animate-pulse" />
+          <div className="absolute w-28 h-28 rounded-full bg-gradient-to-tr from-emerald-400/40 via-teal-300/30 to-sage-400/40 blur-xl animate-pulse transform-gpu will-change-transform" />
 
           {/* Outer animated spinner (Pastel Emerald accent with glow) */}
           <div className="w-16 h-16 rounded-full border-4 border-emerald-600/20 border-t-emerald-600 border-r-emerald-500 animate-spin shadow-[0_0_20px_rgba(16,185,129,0.35)]" />

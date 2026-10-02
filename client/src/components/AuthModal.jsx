@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import confetti from 'canvas-confetti';
 import { useAuth } from '../context/AuthContext';
 import { useEvents } from '../context/EventContext';
 import {
@@ -67,7 +66,6 @@ export const AuthModal = () => {
       if (mode === 'login') {
         const result = await login(email, password);
         if (result.success) {
-          confetti({ particleCount: 80, spread: 60, origin: { y: 0.6 } });
           setSuccessMessage(`Welcome back, ${result.user.name.split(' ')[0]}! Redirecting...`);
           setTimeout(() => {
             closeAuthModal();
@@ -105,7 +103,6 @@ export const AuthModal = () => {
         });
 
         if (result.success) {
-          confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
           setSuccessMessage(`Account created successfully as ${role}! Redirecting...`);
           setTimeout(() => {
             closeAuthModal();
@@ -131,7 +128,7 @@ export const AuthModal = () => {
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/50 backdrop-blur-md overflow-y-auto animate-fadeIn">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-emerald-950/70 backdrop-blur-sm overflow-y-auto animate-fadeIn">
       <div className="relative w-full max-w-md rounded-3xl bg-white/95 p-6 md:p-8 shadow-2xl border border-white text-slate-800 my-8">
         {/* Header */}
         <div className="flex items-center justify-between pb-4 border-b border-emerald-900/10">

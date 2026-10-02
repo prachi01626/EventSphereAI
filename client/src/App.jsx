@@ -86,7 +86,7 @@ const MainLayout = () => {
       <FeedbackModal />
 
       {/* 4. Sage Frosted Footer */}
-      <footer className="border-t border-white/60 bg-white/70 backdrop-blur-md py-8 px-4 text-xs text-slate-600 mt-auto shadow-glass">
+      <footer className="border-t border-white/60 bg-white/85 backdrop-blur-sm py-8 px-4 text-xs text-slate-600 mt-auto shadow-glass transform-gpu">
         <div className="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
           <div className="flex items-center gap-2.5">
             <div className="w-7 h-7 rounded-full bg-black p-0.5 border border-emerald-400/60 overflow-hidden flex items-center justify-center shadow-xs">

@@ -460,17 +460,17 @@ export const VolunteerScanner = () => {
 
               {/* Top Viewport Toolbar */}
               <div className="absolute top-3 left-3 right-3 z-30 flex items-center justify-between pointer-events-auto">
-                <span className="bg-black/60 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-mono text-emerald-400 flex items-center gap-1.5 border border-emerald-500/30">
+                <span className="bg-black/75 backdrop-blur-sm px-3 py-1 rounded-full text-[10px] font-mono text-emerald-400 flex items-center gap-1.5 border border-emerald-500/30">
                   <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
                   TOTP Engine Active
                 </span>
 
                 <button
                   onClick={toggleTorch}
-                  className={`p-2 rounded-full backdrop-blur-md border transition-all ${
+                  className={`p-2 rounded-full backdrop-blur-sm border transition-all ${
                     torchOn
                       ? 'bg-amber-400 text-slate-950 border-amber-300 shadow-md'
-                      : 'bg-black/60 text-slate-300 border-slate-700 hover:text-white'
+                      : 'bg-black/75 text-slate-300 border-slate-700 hover:text-white'
                   }`}
                   title="Toggle Flash / Torch"
                 >

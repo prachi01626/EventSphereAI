@@ -40,8 +40,8 @@ export const DiscoveryLanding = () => {
       {/* Hero Section matching Image 1 & Image 2 */}
       <section className="relative overflow-hidden pt-10 pb-12 px-6 sm:px-10 rounded-3xl glass-panel text-center shadow-glass">
         {/* Ambient foliage glow */}
-        <div className="absolute top-0 right-10 w-80 h-80 bg-emerald-300/30 rounded-full blur-3xl pointer-events-none"></div>
-        <div className="absolute bottom-0 left-10 w-72 h-72 bg-teal-200/30 rounded-full blur-3xl pointer-events-none"></div>
+        <div className="absolute top-0 right-10 w-80 h-80 bg-emerald-300/30 rounded-full blur-3xl pointer-events-none transform-gpu will-change-transform"></div>
+        <div className="absolute bottom-0 left-10 w-72 h-72 bg-teal-200/30 rounded-full blur-3xl pointer-events-none transform-gpu will-change-transform"></div>
 
         <div className="relative z-10 max-w-4xl mx-auto space-y-6">
           {/* Glowing 3D Logo Presentation Badge */}

@@ -7,6 +7,7 @@ import { OrganizerDashboard } from './pages/OrganizerDashboard';
 import { ParticipantPortal } from './pages/ParticipantPortal';
 import { VolunteerScanner } from './pages/VolunteerScanner';
 import { AccessDenied } from './components/AccessDenied';
+import { ProtectedRoute } from './components/ProtectedRoute';
 
 // Modals
 import { AuthModal } from './components/AuthModal';
@@ -20,7 +21,7 @@ import { Shield } from 'lucide-react';
 
 const MainLayout = () => {
   const { activeTab } = useEvents();
-  const { user, isAuthenticated } = useAuth();
+  const { user, isAuthenticated, loading } = useAuth();
 
   // Strict Protected Route Evaluation (RBAC)
   const renderPortal = () => {
@@ -31,27 +32,36 @@ const MainLayout = () => {
 
     // 2. Organizer Hub: Strictly Organizer role only
     if (activeTab === 'organizer') {
-      if (!isAuthenticated || user?.role !== 'Organizer') {
-        return <AccessDenied targetResource="Organizer Hub" requiredRole="Organizer" />;
-      }
-      return <OrganizerDashboard />;
+      return (
+        <ProtectedRoute requiredRole="Organizer" targetResource="Organizer Hub">
+          <OrganizerDashboard />
+        </ProtectedRoute>
+      );
     }
 
     // 3. Volunteer Scanner: Strictly Volunteer or Organizer role only
     // If a Participant navigates to /volunteer-scanner, render 403 Access Denied
     if (activeTab === 'volunteer') {
-      if (!isAuthenticated || (user?.role !== 'Volunteer' && user?.role !== 'Organizer')) {
-        return <AccessDenied targetResource="Volunteer Gate Scanner" requiredRole="Volunteer" />;
-      }
-      return <VolunteerScanner />;
+      return (
+        <ProtectedRoute
+          requiredRole={['Volunteer', 'Organizer']}
+          targetResource="Volunteer Gate Scanner"
+        >
+          <VolunteerScanner />
+        </ProtectedRoute>
+      );
     }
 
     // 4. Participant Portal (My Passes): Authenticated attendees
     if (activeTab === 'participant') {
-      if (!isAuthenticated) {
-        return <AccessDenied targetResource="Attendee Pass Vault" requiredRole="Participant" />;
-      }
-      return <ParticipantPortal />;
+      return (
+        <ProtectedRoute
+          requiredRole={['Participant', 'Organizer', 'Volunteer']}
+          targetResource="Attendee Pass Vault"
+        >
+          <ParticipantPortal />
+        </ProtectedRoute>
+      );
     }
 
     return <DiscoveryLanding />;

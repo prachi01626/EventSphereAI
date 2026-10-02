@@ -18,6 +18,8 @@ import {
   RefreshCw,
   BarChart3,
   TrendingUp,
+  CheckCircle2,
+  AlertCircle,
 } from 'lucide-react';
 
 export const OrganizerDashboard = () => {
@@ -35,6 +37,8 @@ export const OrganizerDashboard = () => {
 
   const [statsData, setStatsData] = useState(null);
   const [loadingStats, setLoadingStats] = useState(false);
+  const [exportingExcel, setExportingExcel] = useState(false);
+  const [exportFeedback, setExportFeedback] = useState(null); // { type: 'success' | 'error', message: string }
 
   const activeEvent = selectedEvent || events[0];
 
@@ -64,10 +68,54 @@ export const OrganizerDashboard = () => {
     avgRating: '5.0',
   };
 
-  const handleExportExcel = () => {
-    if (!activeEvent?._id) return;
-    const url = analyticsService.getExcelExportUrl(activeEvent._id);
-    window.open(url, '_blank');
+  // 1-Click Excel Export: Calls GET /api/analytics/export/:eventId via Axios with Bearer token & blob responseType
+  const handleExportExcel = async () => {
+    if (!activeEvent?._id) {
+      alert('Please select an active event to export registrations.');
+      return;
+    }
+
+    setExportingExcel(true);
+    setExportFeedback(null);
+
+    try {
+      const token =
+        localStorage.getItem('eventsphere_token') ||
+        localStorage.getItem('token') ||
+        '';
+
+      if (!token) {
+        alert('Authentication Error: Please sign in as an Organizer to export registrations.');
+        setExportingExcel(false);
+        return;
+      }
+
+      await analyticsService.exportRegistrationsExcel(activeEvent._id, activeEvent.title);
+
+      setExportFeedback({
+        type: 'success',
+        message: `Excel telemetry report for "${activeEvent.title}" downloaded successfully!`,
+      });
+      setTimeout(() => setExportFeedback(null), 5000);
+    } catch (err) {
+      console.error('Failed to export Excel report:', err);
+      let errMsg = err.message || 'Failed to download Excel report.';
+      if (err.response?.data instanceof Blob) {
+        try {
+          const text = await err.response.data.text();
+          const parsed = JSON.parse(text);
+          errMsg = parsed.message || errMsg;
+        } catch (_) {}
+      }
+
+      setExportFeedback({
+        type: 'error',
+        message: errMsg,
+      });
+      alert(`Excel Export Failed: ${errMsg}`);
+    } finally {
+      setExportingExcel(false);
+    }
   };
 
   return (
@@ -175,13 +223,42 @@ export const OrganizerDashboard = () => {
 
           <button
             onClick={handleExportExcel}
-            className="flex items-center gap-2 px-5 py-2.5 forest-pill-active rounded-2xl text-xs font-bold shadow-pill transition-all hover:scale-105"
+            disabled={exportingExcel}
+            className={`flex items-center gap-2 px-5 py-2.5 forest-pill-active rounded-2xl text-xs font-bold shadow-pill transition-all hover:scale-105 ${
+              exportingExcel ? 'opacity-70 cursor-not-allowed' : ''
+            }`}
           >
-            <Download className="w-4 h-4 text-emerald-300" />
-            <span>1-Click Excel Export</span>
+            <Download className={`w-4 h-4 text-emerald-300 ${exportingExcel ? 'animate-bounce' : ''}`} />
+            <span>{exportingExcel ? 'Generating Excel...' : '1-Click Excel Export'}</span>
           </button>
         </div>
       </div>
+
+      {/* Toast Feedback for Excel Export */}
+      {exportFeedback && (
+        <div
+          className={`p-4 rounded-2xl flex items-center justify-between gap-3 text-xs font-semibold animate-fadeIn border ${
+            exportFeedback.type === 'success'
+              ? 'bg-emerald-50 border-emerald-300 text-emerald-900'
+              : 'bg-rose-50 border-rose-300 text-rose-900'
+          }`}
+        >
+          <div className="flex items-center gap-2.5">
+            {exportFeedback.type === 'success' ? (
+              <CheckCircle2 className="w-4 h-4 text-emerald-700 shrink-0" />
+            ) : (
+              <AlertCircle className="w-4 h-4 text-rose-700 shrink-0" />
+            )}
+            <span>{exportFeedback.message}</span>
+          </div>
+          <button
+            onClick={() => setExportFeedback(null)}
+            className="text-[11px] underline opacity-80 hover:opacity-100"
+          >
+            Dismiss
+          </button>
+        </div>
+      )}
 
       {/* Metrics Row (Total Overview style matching Image 1 top widgets) */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
